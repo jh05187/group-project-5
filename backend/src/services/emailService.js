@@ -18,7 +18,7 @@ function getResendClient() {
 export async function sendVerificationCodeEmail({ email, username, code }) {
   const resend = getResendClient();
 
-  await resend.emails.send({
+  const result = await resend.emails.send({
     from: env.emailFrom,
     to: email,
     subject: `Your ScamShield Hub verification code: ${code}`,
@@ -34,4 +34,10 @@ export async function sendVerificationCodeEmail({ email, username, code }) {
       </div>
     `,
   });
+
+  if (result.error) {
+    throw new Error(result.error.message || "Failed to send verification email");
+  }
+
+  return result.data;
 }
