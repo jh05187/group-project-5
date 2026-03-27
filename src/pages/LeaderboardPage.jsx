@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 
@@ -276,7 +277,11 @@ function LeaderboardPage() {
             rows.map((row) => (
               <tr key={row.id}>
                 <td>{row.rank}</td>
-                <td>{row.username}</td>
+                <td>
+                  <Link className="inline-link" to={`/users/${row.id}`}>
+                    {row.username}
+                  </Link>
+                </td>
                 <td>{row.reputationScore}</td>
                 <td>{row.level}</td>
                 <td>{row.accuracyRate}%</td>

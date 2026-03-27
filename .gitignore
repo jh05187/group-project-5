@@ -5,3 +5,4 @@ dist/
 backend/.env
 .DS_Store
 npm-debug.log*
+project_handoff.md

@@ -3,41 +3,50 @@ import mongoose from "mongoose";
 import { CaseModel } from "../models/Case.js";
 import { Vote } from "../models/Vote.js";
 import { Comment } from "../models/Comment.js";
-import { requireAuth } from "../middleware/auth.js";
+import { attachOptionalAuth, requireAuth } from "../middleware/auth.js";
 import { accuracyRate, computeBadges, levelFromScore, pointsForAnswer } from "../utils/scoring.js";
 
 const router = express.Router();
 
-router.get("/", async (req, res) => {
+router.get("/", attachOptionalAuth, async (req, res) => {
   const { difficulty, contentType, unattempted } = req.query;
   const filter = { isPublished: true };
   if (difficulty) filter.difficulty = difficulty;
   if (contentType) filter.contentType = contentType;
 
-  let excludedCaseIds = [];
-  if (unattempted === "true") {
-    const auth = req.headers.authorization || "";
-    const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
-    if (token) {
-      try {
-        const jwt = await import("jsonwebtoken");
-        const { env } = await import("../config/env.js");
-        const payload = jwt.default.verify(token, env.jwtSecret);
-        const votes = await Vote.find({ userId: payload.userId }).select("caseId");
-        excludedCaseIds = votes.map((v) => v.caseId);
-      } catch {
-        excludedCaseIds = [];
-      }
-    }
+  let attemptedMap = new Map();
+  if (req.user?._id) {
+    const votes = await Vote.find({ userId: req.user._id }).select("caseId createdAt isCorrect answer");
+    attemptedMap = new Map(
+      votes.map((vote) => [
+        vote.caseId.toString(),
+        {
+          attemptedAt: vote.createdAt,
+          isCorrect: vote.isCorrect,
+          answer: vote.answer,
+        },
+      ]),
+    );
   }
 
-  if (excludedCaseIds.length) filter._id = { $nin: excludedCaseIds };
+  if (unattempted === "true" && attemptedMap.size) {
+    filter._id = { $nin: [...attemptedMap.keys()] };
+  }
 
   const cases = await CaseModel.find(filter)
     .sort({ createdAt: -1 })
     .select("-__v")
     .lean();
-  return res.json({ cases });
+  return res.json({
+    cases: cases.map((caseItem) => {
+      const attempt = attemptedMap.get(caseItem._id.toString());
+      return {
+        ...caseItem,
+        attempted: Boolean(attempt),
+        attemptSummary: attempt || null,
+      };
+    }),
+  });
 });
 
 router.get("/:id", async (req, res) => {

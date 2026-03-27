@@ -27,3 +27,23 @@ export function requireRole(role) {
     return next();
   };
 }
+
+export async function attachOptionalAuth(req, res, next) {
+  try {
+    const auth = req.headers.authorization || "";
+    const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
+
+    if (!token) {
+      req.user = null;
+      return next();
+    }
+
+    const payload = jwt.verify(token, env.jwtSecret);
+    const user = await User.findById(payload.userId);
+    req.user = user || null;
+    return next();
+  } catch {
+    req.user = null;
+    return next();
+  }
+}

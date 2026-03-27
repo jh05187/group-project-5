@@ -13,7 +13,6 @@ function CaseFeedPage() {
     const params = new URLSearchParams();
     if (difficulty) params.set("difficulty", difficulty);
     if (contentType) params.set("contentType", contentType);
-    params.set("unattempted", "true");
 
     setLoading(true);
     setError("");
@@ -23,10 +22,18 @@ function CaseFeedPage() {
       .finally(() => setLoading(false));
   }, [difficulty, contentType]);
 
+  const availableCases = cases.filter((item) => !item.attempted);
+  const completedCases = cases.filter((item) => item.attempted);
+
   return (
     <section>
       <div className="page-title-row">
-        <h2>Case Feed</h2>
+        <div>
+          <h2>Case Feed</h2>
+          <p className="supporting-copy">
+            New cases stay at the top. Completed ones remain available below so users can review and learn from them again.
+          </p>
+        </div>
         <div className="filters">
           <select value={contentType} onChange={(e) => setContentType(e.target.value)}>
             <option value="">All Types</option>
@@ -42,14 +49,39 @@ function CaseFeedPage() {
           </select>
         </div>
       </div>
+
       {loading ? <p>Loading cases...</p> : null}
       {error ? <p className="error">{error}</p> : null}
-      <div className="case-grid">
-        {cases.map((item) => (
-          <CaseCard key={item._id} item={item} />
-        ))}
-      </div>
-      {!loading && !cases.length ? <p>No cases found for current filters.</p> : null}
+
+      <section className="case-section">
+        <div className="section-head">
+          <div>
+            <h3>Available Cases</h3>
+            <p className="supporting-copy">Cases you have not answered yet.</p>
+          </div>
+        </div>
+        <div className="case-grid">
+          {availableCases.map((item) => (
+            <CaseCard key={item._id} item={item} />
+          ))}
+        </div>
+        {!loading && !availableCases.length ? <p className="muted-text">No new cases found for current filters.</p> : null}
+      </section>
+
+      <section className="case-section">
+        <div className="section-head">
+          <div>
+            <h3>Completed Cases</h3>
+            <p className="supporting-copy">Review cases you have already answered.</p>
+          </div>
+        </div>
+        <div className="case-grid">
+          {completedCases.map((item) => (
+            <CaseCard key={item._id} item={item} />
+          ))}
+        </div>
+        {!loading && !completedCases.length ? <p className="muted-text">You have not completed any cases in this filtered view yet.</p> : null}
+      </section>
     </section>
   );
 }

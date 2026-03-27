@@ -135,7 +135,14 @@ function CaseDetailPage() {
           <article key={comment.id} className="comment-item">
             <p>{comment.body}</p>
             <small>
-              {comment.user?.username || "Unknown"} |{" "}
+              {comment.user ? (
+                <Link className="inline-link" to={`/users/${comment.user.id}`}>
+                  {comment.user.username}
+                </Link>
+              ) : (
+                "Unknown"
+              )}{" "}
+              |{" "}
               {new Date(comment.createdAt).toLocaleString("en-US")}
             </small>
           </article>

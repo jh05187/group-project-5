@@ -9,6 +9,7 @@ import ProfilePage from "./pages/ProfilePage";
 import LeaderboardPage from "./pages/LeaderboardPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import NotFoundPage from "./pages/NotFoundPage";
+import PublicProfilePage from "./pages/PublicProfilePage";
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route path="/users/:id" element={<PublicProfilePage />} />
         <Route
           path="/leaderboard"
           element={
