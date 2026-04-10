@@ -2,39 +2,60 @@ import { useEffect, useState } from "react";
 import { useCallback } from "react";
 import { Link } from "react-router-dom";
 function FriendsList({ friends, friendRequests, onAccept, onRemove }) {
+  const getId = (user) => user?.id || user?._id;
+
   return (
     <section className="panel">
       <div className="section-head">
-        <h3>Friends</h3>
+        <div>
+          <h3>Friends</h3>
+          <p className="supporting-copy">Manage study connections and jump into private messages.</p>
+        </div>
       </div>
-      <div>
-        <strong>Friends:</strong>
+      <div className="friend-list-block">
+        <strong>Friends</strong>
         {friends?.length ? (
-          <ul>
+          <div className="friend-card-list">
             {friends.map((f) => (
-              <li key={f._id}>
-                {f.username} ({f.email})
-                <button style={{marginLeft: 8}} onClick={() => onRemove(f._id)}>Remove</button>
-                <Link className="btn btn-small btn-muted" style={{marginLeft: 8}} to={`/messages?userId=${f._id}`}>
+              <article className="friend-card" key={getId(f)}>
+                <div>
+                  <Link className="inline-link" to={`/users/${getId(f)}`}>
+                    <strong>{f.username}</strong>
+                  </Link>
+                  <p className="muted-text">{f.email}</p>
+                </div>
+                <div className="admin-actions">
+                  <Link className="btn btn-small btn-muted" to={`/messages?userId=${getId(f)}`}>
                   Message
                 </Link>
-              </li>
+                  <button className="btn btn-small btn-ghost" type="button" onClick={() => onRemove(getId(f))}>
+                    Remove
+                  </button>
+                </div>
+              </article>
             ))}
-          </ul>
-        ) : <span>No friends yet.</span>}
+          </div>
+        ) : <p className="muted-text">No friends yet. Use Messages to search for classmates.</p>}
       </div>
-      <div style={{marginTop: 12}}>
-        <strong>Friend Requests:</strong>
+      <div className="friend-list-block">
+        <strong>Friend Requests</strong>
         {friendRequests?.length ? (
-          <ul>
+          <div className="friend-card-list">
             {friendRequests.map((f) => (
-              <li key={f._id}>
-                {f.username} ({f.email})
-                <button style={{marginLeft: 8}} onClick={() => onAccept(f._id)}>Accept</button>
-              </li>
+              <article className="friend-card" key={getId(f)}>
+                <div>
+                  <Link className="inline-link" to={`/users/${getId(f)}`}>
+                    <strong>{f.username}</strong>
+                  </Link>
+                  <p className="muted-text">{f.email}</p>
+                </div>
+                <button className="btn btn-success btn-small" type="button" onClick={() => onAccept(getId(f))}>
+                  Accept
+                </button>
+              </article>
             ))}
-          </ul>
-        ) : <span>No pending requests.</span>}
+          </div>
+        ) : <p className="muted-text">No pending requests.</p>}
       </div>
     </section>
   );

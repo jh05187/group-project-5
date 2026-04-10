@@ -431,9 +431,48 @@ tr:nth-child(even) td {
   gap: 1rem;
 }
 
+.dm-sidebar {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+}
+
 .dm-thread-list {
   display: grid;
   gap: 0.8rem;
+}
+
+.dm-search-panel,
+.dm-requests-panel {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.dm-user-results {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.dm-user-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 1px solid rgba(117, 186, 255, 0.14);
+  border-radius: 14px;
+  background: rgba(8, 17, 29, 0.86);
+  padding: 0.75rem;
+}
+
+.dm-user-result p {
+  margin: 0.2rem 0 0;
+}
+
+.dm-user-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  justify-content: flex-end;
 }
 
 .dm-thread-list h3,
@@ -537,6 +576,46 @@ tr:nth-child(even) td {
   min-height: 74px;
 }
 
+.dm-empty-state {
+  align-self: center;
+  justify-self: center;
+  max-width: 420px;
+  text-align: center;
+}
+
+.friend-list-block {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.85rem;
+}
+
+.friend-card-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.friend-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  border: 1px solid rgba(117, 186, 255, 0.14);
+  border-radius: 14px;
+  background: rgba(8, 17, 29, 0.78);
+  padding: 0.75rem;
+}
+
+.friend-card p {
+  margin: 0.2rem 0 0;
+}
+
+.profile-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.85rem;
+}
+
 @media (max-width: 900px) {
   .dm-grid {
     grid-template-columns: 1fr;
@@ -556,7 +635,7 @@ tr:nth-child(even) td {
 }
 
 .notice {
-  color: #9ff8bc;
+  color: #9ad8ff;
 }
 
 .auth-panel {
@@ -731,6 +810,11 @@ tr:nth-child(even) td {
   border-radius: 999px;
   font-size: 0.8rem;
   font-weight: 700;
+}
+
+.status-chip {
+  background: rgba(75, 136, 220, 0.22);
+  color: #cfe9ff;
 }
 
 .role-pill {

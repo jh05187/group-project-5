@@ -132,7 +132,6 @@ function LeaderboardPage() {
   const [groups, setGroups] = useState([]);
   const [activeGroup, setActiveGroup] = useState(null);
   const [pickerGroup, setPickerGroup] = useState(null);
-  const [friendsGroup, setFriendsGroup] = useState({ id: "__friends__", name: "Friends" });
   const [friends, setFriends] = useState([]);
 
   // Load user's friends for the Friends leaderboard
@@ -142,7 +141,9 @@ function LeaderboardPage() {
       try {
         const res = await api("/users/friends/list");
         setFriends(res.friends || []);
-      } catch {}
+      } catch (err) {
+        setError(err.message);
+      }
     }
     fetchFriends();
   }, [user]);
@@ -263,7 +264,7 @@ function LeaderboardPage() {
         >
           Friends
         </button>
-        {groups.map((group, idx) => (
+        {groups.map((group) => (
           <span key={group.id} className="group-tab-wrap">
             <button
               className={`group-tab ${activeGroup === group.id ? "active" : ""}`}

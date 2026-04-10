@@ -6,6 +6,7 @@ import { User } from "../models/User.js";
 import { Vote } from "../models/Vote.js";
 import { LeaderboardGroup } from "../models/LeaderboardGroup.js";
 import { PendingSignup } from "../models/PendingSignup.js";
+import { DirectMessage } from "../models/DirectMessage.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 
 const router = express.Router();
@@ -175,6 +176,8 @@ router.delete("/users/:id", async (req, res) => {
   await Promise.all([
     Vote.deleteMany({ userId: deleted._id }),
     Comment.deleteMany({ userId: deleted._id }),
+    DirectMessage.deleteMany({ $or: [{ senderId: deleted._id }, { recipientId: deleted._id }] }),
+    User.updateMany({}, { $pull: { friends: deleted._id, friendRequests: deleted._id } }),
     PendingSignup.deleteMany({ email: deleted.email }),
     LeaderboardGroup.updateMany({}, { $pull: { members: deleted._id } }),
     LeaderboardGroup.deleteMany({ createdBy: deleted._id }),

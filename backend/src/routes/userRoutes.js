@@ -10,46 +10,107 @@ import { User } from "../models/User.js";
 const router = express.Router();
 
 // --- FRIENDS SYSTEM ROUTES ---
+function sameId(a, b) {
+  return a?.toString() === b?.toString();
+}
+
+function hasId(list = [], id) {
+  return list.some((item) => sameId(item, id));
+}
+
+function publicUserSummary(user) {
+  return {
+    id: user._id,
+    _id: user._id,
+    username: user.username,
+    email: user.email,
+    role: user.role,
+    level: user.level,
+    reputationScore: user.reputationScore,
+  };
+}
+
+function getFriendshipStatus(viewer, target) {
+  if (!viewer) return "public";
+  if (sameId(viewer._id, target._id)) return "self";
+  if (hasId(viewer.friends, target._id)) return "friends";
+  if (hasId(target.friendRequests, viewer._id)) return "outgoing_request";
+  if (hasId(viewer.friendRequests, target._id)) return "incoming_request";
+  return "none";
+}
+
 // Send a friend request
 router.post("/friends/request/:targetId", requireAuth, async (req, res) => {
   const { targetId } = req.params;
-  if (req.user._id.toString() === targetId) return res.status(400).json({ error: "Cannot friend yourself" });
+  if (!mongoose.Types.ObjectId.isValid(targetId)) {
+    return res.status(400).json({ error: "Invalid user id" });
+  }
+  if (sameId(req.user._id, targetId)) return res.status(400).json({ error: "Cannot friend yourself" });
   const target = await User.findById(targetId);
   if (!target) return res.status(404).json({ error: "User not found" });
-  if (target.friends?.includes(req.user._id)) return res.status(400).json({ error: "Already friends" });
-  if (target.friendRequests?.includes(req.user._id)) return res.status(400).json({ error: "Request already sent" });
+  if (hasId(req.user.friends, target._id) || hasId(target.friends, req.user._id)) {
+    return res.status(400).json({ error: "Already friends" });
+  }
+  if (hasId(target.friendRequests, req.user._id)) return res.status(400).json({ error: "Request already sent" });
+  if (hasId(req.user.friendRequests, target._id)) {
+    return res.status(400).json({ error: "This user already sent you a request. Accept it from your profile or messages page." });
+  }
   target.friendRequests = [...(target.friendRequests || []), req.user._id];
   await target.save();
-  return res.json({ success: true });
+  return res.json({ success: true, status: "outgoing_request" });
 });
 
 // Accept a friend request
 router.post("/friends/accept/:requesterId", requireAuth, async (req, res) => {
   const { requesterId } = req.params;
-  if (req.user.friendRequests?.includes(requesterId)) {
-    req.user.friends = [...(req.user.friends || []), requesterId];
-    req.user.friendRequests = req.user.friendRequests.filter((id) => id.toString() !== requesterId);
-    await req.user.save();
-    // Add user to requester's friends
-    const requester = await User.findById(requesterId);
-    if (requester) {
-      requester.friends = [...(requester.friends || []), req.user._id];
-      await requester.save();
-    }
-    return res.json({ success: true });
+  if (!mongoose.Types.ObjectId.isValid(requesterId)) {
+    return res.status(400).json({ error: "Invalid user id" });
   }
-  return res.status(400).json({ error: "No such friend request" });
+
+  const [currentUser, requester] = await Promise.all([
+    User.findById(req.user._id),
+    User.findById(requesterId),
+  ]);
+
+  if (!currentUser || !requester) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  if (!hasId(currentUser.friendRequests, requester._id)) {
+    return res.status(400).json({ error: "No such friend request" });
+  }
+
+  if (!hasId(currentUser.friends, requester._id)) {
+    currentUser.friends.push(requester._id);
+  }
+  currentUser.friendRequests = currentUser.friendRequests.filter((id) => !sameId(id, requester._id));
+
+  if (!hasId(requester.friends, currentUser._id)) {
+    requester.friends.push(currentUser._id);
+  }
+
+  await Promise.all([currentUser.save(), requester.save()]);
+  return res.json({ success: true, status: "friends" });
 });
 
 // Remove a friend
 router.post("/friends/remove/:friendId", requireAuth, async (req, res) => {
   const { friendId } = req.params;
-  req.user.friends = (req.user.friends || []).filter((id) => id.toString() !== friendId);
-  await req.user.save();
-  // Remove user from friend's list
+  if (!mongoose.Types.ObjectId.isValid(friendId)) {
+    return res.status(400).json({ error: "Invalid user id" });
+  }
+
+  const currentUser = await User.findById(req.user._id);
+  if (!currentUser) return res.status(404).json({ error: "User not found" });
+
+  currentUser.friends = (currentUser.friends || []).filter((id) => !sameId(id, friendId));
+  currentUser.friendRequests = (currentUser.friendRequests || []).filter((id) => !sameId(id, friendId));
+  await currentUser.save();
+
   const friend = await User.findById(friendId);
   if (friend) {
-    friend.friends = (friend.friends || []).filter((id) => id.toString() !== req.user._id.toString());
+    friend.friends = (friend.friends || []).filter((id) => !sameId(id, req.user._id));
+    friend.friendRequests = (friend.friendRequests || []).filter((id) => !sameId(id, req.user._id));
     await friend.save();
   }
   return res.json({ success: true });
@@ -58,7 +119,36 @@ router.post("/friends/remove/:friendId", requireAuth, async (req, res) => {
 // List friends (detailed)
 router.get("/friends/list", requireAuth, async (req, res) => {
   const populated = await User.findById(req.user._id).populate("friends", "_id username email").populate("friendRequests", "_id username email");
-  return res.json({ friends: populated.friends, friendRequests: populated.friendRequests });
+  return res.json({
+    friends: (populated?.friends || []).map(publicUserSummary),
+    friendRequests: (populated?.friendRequests || []).map(publicUserSummary),
+  });
+});
+
+router.get("/search", requireAuth, async (req, res) => {
+  const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  if (query.length < 2) {
+    return res.json({ users: [] });
+  }
+
+  const safeQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const users = await User.find({
+    _id: { $ne: req.user._id },
+    $or: [
+      { username: { $regex: safeQuery, $options: "i" } },
+      { email: { $regex: safeQuery, $options: "i" } },
+    ],
+  })
+    .select("_id username email role level reputationScore friends friendRequests")
+    .limit(10)
+    .lean();
+
+  return res.json({
+    users: users.map((user) => ({
+      ...publicUserSummary(user),
+      friendshipStatus: getFriendshipStatus(req.user, user),
+    })),
+  });
 });
 
 function calculateDifficultyBadges(difficultyBreakdown) {
@@ -176,7 +266,7 @@ function buildAnsweredCases(votes) {
 }
 
 async function buildUserProfilePayload(user, viewerRole = "public") {
-  const [userVotes, commentsCount, publishedCasesCount, recentComments] = await Promise.all([
+  const [userVotes, commentsCount, publishedCasesCount, recentComments, friendDoc] = await Promise.all([
     Vote.find({ userId: user._id })
       .populate("caseId", "title difficulty contentType")
       .sort({ createdAt: -1 })
@@ -187,6 +277,11 @@ async function buildUserProfilePayload(user, viewerRole = "public") {
       .populate("caseId", "title")
       .sort({ createdAt: -1 })
       .limit(5)
+      .lean(),
+    User.findById(user._id)
+      .select("friends friendRequests")
+      .populate("friends", "_id username email role level reputationScore")
+      .populate("friendRequests", "_id username email role level reputationScore")
       .lean(),
   ]);
 
@@ -270,8 +365,8 @@ async function buildUserProfilePayload(user, viewerRole = "public") {
       caseTitle: comment.caseId?.title || "Unknown case",
     })),
     joinedAt: user.createdAt,
-    friends: user.friends || [],
-    friendRequests: user.friendRequests || [],
+    friends: (friendDoc?.friends || []).map(publicUserSummary),
+    friendRequests: (friendDoc?.friendRequests || []).map(publicUserSummary),
   };
 
   if (viewerRole === "self") {
@@ -321,6 +416,9 @@ router.get("/:id", attachOptionalAuth, async (req, res) => {
         : "public";
 
   const user = await buildUserProfilePayload(targetUser, viewerRole);
+  if (req.user) {
+    user.friendshipStatus = getFriendshipStatus(req.user, targetUser);
+  }
   return res.json({ user, viewerRole });
 });
 

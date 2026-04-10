@@ -100,19 +100,11 @@ import { api } from "../lib/api";
 import { useParams } from "react-router-dom";
 
 function PublicProfilePage() {
-  const [friendRequestSent, setFriendRequestSent] = useState(false);
-  async function sendFriendRequest() {
-    try {
-      await api(`/users/friends/request/${id}`, { method: "POST" });
-      setFriendRequestSent(true);
-    } catch (err) {
-      setError(err.message);
-    }
-  }
   const { id } = useParams();
   const [profile, setProfile] = useState(null);
   const [viewerRole, setViewerRole] = useState("public");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [confirmAction, setConfirmAction] = useState(null);
 
   const loadProfile = useCallback(async () => {
@@ -124,6 +116,30 @@ function PublicProfilePage() {
   useEffect(() => {
     loadProfile().catch((err) => setError(err.message));
   }, [loadProfile]);
+
+  async function sendFriendRequest() {
+    try {
+      setError("");
+      setNotice("");
+      await api(`/users/friends/request/${id}`, { method: "POST" });
+      setNotice("Friend request sent.");
+      await loadProfile();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function acceptFriendRequest() {
+    try {
+      setError("");
+      setNotice("");
+      await api(`/users/friends/accept/${id}`, { method: "POST" });
+      setNotice("Friend request accepted.");
+      await loadProfile();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
 
   async function deleteComment(commentId) {
     try {
@@ -160,19 +176,33 @@ function PublicProfilePage() {
           </p>
           <DifficultyBadges badges={profile.badges} role={profile.role} />
           {viewerRole !== "self" && viewerRole !== "admin" && (
-            <div style={{ display: "flex", gap: "8px", marginTop: 12, flexWrap: "wrap" }}>
-              <button
-                className="btn btn-primary"
-                onClick={sendFriendRequest}
-                disabled={friendRequestSent}
-              >
-                {friendRequestSent ? "Request Sent" : "Send Friend Request"}
-              </button>
-              <Link className="btn btn-muted" to={`/messages?userId=${id}`}>
-                Message
-              </Link>
+            <div className="profile-action-row">
+              {profile.friendshipStatus === "friends" ? (
+                <Link className="btn btn-primary" to={`/messages?userId=${id}`}>
+                  Message
+                </Link>
+              ) : null}
+              {profile.friendshipStatus === "none" ? (
+                <button className="btn btn-primary" type="button" onClick={sendFriendRequest}>
+                  Send Friend Request
+                </button>
+              ) : null}
+              {profile.friendshipStatus === "incoming_request" ? (
+                <button className="btn btn-success" type="button" onClick={acceptFriendRequest}>
+                  Accept Friend Request
+                </button>
+              ) : null}
+              {profile.friendshipStatus === "outgoing_request" ? (
+                <span className="status-chip">Friend request pending</span>
+              ) : null}
+              {!profile.friendshipStatus || profile.friendshipStatus === "public" ? (
+                <Link className="btn btn-muted" to="/auth">
+                  Log in to connect
+                </Link>
+              ) : null}
             </div>
           )}
+          {notice ? <p className="notice">{notice}</p> : null}
           {viewerRole === "admin" && profile.adminView ? (
             <div className="admin-private-block">
               <p className="muted-text">Admin-only details</p>
