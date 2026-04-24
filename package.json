@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:backend": "npm --prefix backend run dev",
-    "seed": "npm --prefix backend run seed",
+    "seed": "echo Seeding is temporarily disabled to protect live case data.",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"

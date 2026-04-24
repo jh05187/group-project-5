@@ -1,33 +1,71 @@
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 
 function Layout() {
   const { user, logout } = useAuth();
+  const [navOpen, setNavOpen] = useState(false);
+  const location = useLocation();
+
+  useEffect(() => {
+    setNavOpen(false);
+  }, [location.pathname]);
+
+  const navItems = useMemo(
+    () => [
+      { to: "/", label: "Home" },
+      { to: "/cases", label: "Case Feed" },
+      { to: "/leaderboard", label: "Leaderboard" },
+      ...(user ? [{ to: "/messages", label: "Messages" }] : []),
+      { to: user ? "/profile" : "/auth", label: user ? "Profile" : "Login" },
+      ...(user?.role === "admin" ? [{ to: "/admin", label: "Admin" }] : []),
+    ],
+    [user],
+  );
 
   return (
     <div className="app-shell">
       <header className="topbar">
-        <Link to="/" className="brand">
-          ScamShield Hub
-        </Link>
-        <nav className="nav">
-          <NavLink to="/">Home</NavLink>
-          <NavLink to="/cases">Case Feed</NavLink>
-          <NavLink to="/leaderboard">Leaderboard</NavLink>
-          {user ? <NavLink to="/messages">Messages</NavLink> : null}
-          {user ? <NavLink to="/profile">Profile</NavLink> : <NavLink to="/auth">Login</NavLink>}
-          {user?.role === "admin" ? <NavLink to="/admin">Admin</NavLink> : null}
+        <div className="topbar-left">
+          <Link to="/" className="brand">
+            <span className="brand-mark">SH</span>
+            <span>
+              ScamShield Hub
+              <small>Phishing practice and peer learning</small>
+            </span>
+          </Link>
+          <button
+            className="nav-toggle"
+            type="button"
+            onClick={() => setNavOpen((value) => !value)}
+            aria-expanded={navOpen}
+            aria-label="Toggle navigation"
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+        </div>
+        <nav className={`nav ${navOpen ? "open" : ""}`}>
+          {navItems.map((item) => (
+            <NavLink key={item.to} to={item.to}>
+              {item.label}
+            </NavLink>
+          ))}
         </nav>
         <div className="topbar-right">
           {user ? (
             <>
-              <span className="chip">{user.username}</span>
+              <div className="topbar-identity">
+                <span className="chip">{user.username}</span>
+                <small>{user.role === "admin" ? "Administrator" : "Learner"}</small>
+              </div>
               <button className="link-button" type="button" onClick={logout}>
                 Logout
               </button>
             </>
           ) : (
-            <Link to="/auth" className="chip">
+            <Link to="/auth" className="chip chip-action">
               Register
             </Link>
           )}

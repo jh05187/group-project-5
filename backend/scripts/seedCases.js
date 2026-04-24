@@ -36,6 +36,13 @@ function generateCase(i) {
 }
 
 async function seed() {
+  if (process.env.ALLOW_DESTRUCTIVE_SEED !== "true") {
+    console.error(
+      'Seed blocked. Set ALLOW_DESTRUCTIVE_SEED=true if you intentionally want to reset case data.',
+    );
+    process.exit(1);
+  }
+
   await connectDb(env.mongoUri);
   await CaseModel.deleteMany({});
   await CaseModel.insertMany(Array.from({ length: 120 }, (_, i) => generateCase(i)));

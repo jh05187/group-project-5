@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { EmptyState, LoadingBlock, StatusBanner } from "../components/Feedback";
 import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 
@@ -129,10 +130,12 @@ function LeaderboardPage() {
   const { user } = useAuth();
   const [rows, setRows] = useState([]);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [groups, setGroups] = useState([]);
   const [activeGroup, setActiveGroup] = useState(null);
   const [pickerGroup, setPickerGroup] = useState(null);
   const [friends, setFriends] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   // Load user's friends for the Friends leaderboard
   useEffect(() => {
@@ -153,6 +156,7 @@ function LeaderboardPage() {
       // Show leaderboard for friends
       if (!friends.length) {
         setRows([]);
+        setLoading(false);
         return;
       }
       try {
@@ -165,6 +169,8 @@ function LeaderboardPage() {
         setRows(result?.leaderboard ?? []);
       } catch (err) {
         setError(err.message);
+      } finally {
+        setLoading(false);
       }
       return;
     }
@@ -174,6 +180,8 @@ function LeaderboardPage() {
       setRows(result?.leaderboard ?? []);
     } catch (err) {
       setError(err.message);
+    } finally {
+      setLoading(false);
     }
   }, [friends, user]);
 
@@ -187,6 +195,7 @@ function LeaderboardPage() {
   }, []);
 
   useEffect(() => {
+    setLoading(true);
     loadLeaderboard();
     loadGroups();
   }, [loadGroups, loadLeaderboard]);
@@ -203,6 +212,7 @@ function LeaderboardPage() {
       });
       if (!result?.group) throw new Error("Invalid response from server");
       setGroups((prev) => [...prev, result.group]);
+      setNotice(`Created "${result.group.name}". Use Manage to add members.`);
     } catch (err) {
       setError(err.message);
     }
@@ -216,6 +226,7 @@ function LeaderboardPage() {
     try {
       await api(`/leaderboard/groups/${group.id}`, { method: "DELETE" });
       setGroups((prev) => prev.filter((item) => item.id !== group.id));
+      setNotice(`Deleted "${group.name}".`);
       if (activeGroup === group.id) {
         setActiveGroup(null);
         loadLeaderboard();
@@ -231,8 +242,17 @@ function LeaderboardPage() {
   function selectGroup(groupId) {
     setActiveGroup(groupId);
     setError("");
+    setNotice("");
+    setLoading(true);
     loadLeaderboard(groupId);
   }
+
+  const activeModeLabel =
+    activeGroup === "__friends__"
+      ? "Friends"
+      : activeGroup
+        ? groups.find((group) => group.id === activeGroup)?.name || "Group"
+        : "Global";
 
   return (
     <section className="panel">
@@ -240,13 +260,37 @@ function LeaderboardPage() {
         <div>
           <h2>Leaderboard</h2>
           <p className="supporting-copy">
-            Global shows everyone. Group mode is a smaller comparison board for classmates, which
-            is why you may have seen extra controls here.
+            Global ranks everyone, Friends narrows the board to your accepted connections, and
+            Groups let you build smaller comparison boards for classmates or project teammates.
           </p>
         </div>
         <button className="btn btn-primary" onClick={createGroup} type="button">
           Create Group
         </button>
+      </div>
+
+      <div className="metrics-grid leaderboard-summary">
+        <div className="metric">
+          <span className="metric-label">Current mode</span>
+          <strong>{activeModeLabel}</strong>
+          <span className="metric-hint">
+            {activeGroup === "__friends__"
+              ? "Only you and your friends"
+              : activeGroup
+                ? "Members inside the selected group"
+                : "All users ranked together"}
+          </span>
+        </div>
+        <div className="metric">
+          <span className="metric-label">Groups</span>
+          <strong>{groups.length}</strong>
+          <span className="metric-hint">Custom boards available</span>
+        </div>
+        <div className="metric">
+          <span className="metric-label">Rows shown</span>
+          <strong>{rows.length}</strong>
+          <span className="metric-hint">Learners currently ranked</span>
+        </div>
       </div>
 
       <div className="group-tabs">
@@ -295,44 +339,57 @@ function LeaderboardPage() {
         ))}
       </div>
 
-      {error ? <p className="error">{error}</p> : null}
+      <StatusBanner type="error" message={error} />
+      <StatusBanner type="info" message={notice} />
 
-      <table>
-        <thead>
-          <tr>
-            <th>Rank</th>
-            <th>User</th>
-            <th>Score</th>
-            <th>Level</th>
-            <th>Accuracy</th>
-            <th>Votes</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 ? (
-            <tr>
-              <td colSpan={6} className="table-empty">
-                {activeGroup ? "No members in this group yet. Click Manage to add some." : "No results"}
-              </td>
-            </tr>
-          ) : (
-            rows.map((row) => (
-              <tr key={row.id}>
-                <td>{row.rank}</td>
-                <td>
-                  <Link className="inline-link" to={`/users/${row.id}`}>
-                    {row.username}
-                  </Link>
-                </td>
-                <td>{row.reputationScore}</td>
-                <td>{row.level}</td>
-                <td>{row.accuracyRate}%</td>
-                <td>{row.totalVotes}</td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+      {loading ? <LoadingBlock label="Refreshing leaderboard..." /> : null}
+
+      {!loading ? (
+        rows.length ? (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>User</th>
+                  <th>Score</th>
+                  <th>Level</th>
+                  <th>Accuracy</th>
+                  <th>Votes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.id} className={String(row.id) === String(user?.id) ? "leaderboard-row-self" : ""}>
+                    <td>{row.rank}</td>
+                    <td>
+                      <div className="leaderboard-user-cell">
+                        <Link className="inline-link" to={`/users/${row.id}`}>
+                          {row.username}
+                        </Link>
+                        {String(row.id) === String(user?.id) ? <span className="status-chip">You</span> : null}
+                      </div>
+                    </td>
+                    <td>{row.reputationScore}</td>
+                    <td>{row.level}</td>
+                    <td>{row.accuracyRate}%</td>
+                    <td>{row.totalVotes}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyState
+            title="No rankings to show yet"
+            description={
+              activeGroup
+                ? "This board does not have enough members yet. Add a few people first and the ranking will appear here."
+                : "Once learners start answering cases, this leaderboard will fill in automatically."
+            }
+          />
+        )
+      ) : null}
 
       {pickerGroup ? (
         <MemberPicker

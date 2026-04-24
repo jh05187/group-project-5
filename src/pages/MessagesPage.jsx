@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { EmptyState, LoadingBlock, StatusBanner } from "../components/Feedback";
 import { api } from "../lib/api";
 
 function formatTime(iso) {
@@ -20,9 +21,17 @@ function getUserId(user) {
 function ThreadList({ threads, selectedUserId, onSelect }) {
   return (
     <div className="panel dm-thread-list">
-      <h3>Conversations</h3>
+      <div className="section-head compact">
+        <div>
+          <h3>Conversations</h3>
+          <p className="supporting-copy">Recent chats stay at the top so active threads remain easy to find.</p>
+        </div>
+      </div>
       {!threads.length ? (
-        <p className="supporting-copy">No friends yet. Search for a learner and send a friend request to start chatting.</p>
+        <EmptyState
+          title="No conversations yet"
+          description="Search for a learner, add them as a friend, and your private conversations will appear here."
+        />
       ) : (
         <div className="dm-thread-items">
           {threads.map((thread) => {
@@ -53,21 +62,20 @@ function ThreadList({ threads, selectedUserId, onSelect }) {
 function UserSearch({ query, setQuery, results, onAdd, onAccept, onMessage, searching }) {
   return (
     <div className="panel dm-search-panel">
-      <div className="section-head">
+      <div className="section-head compact">
         <div>
           <h3>Find People</h3>
           <p className="supporting-copy">Search by username or email, send a friend request, then start a private message.</p>
         </div>
       </div>
 
-      <input
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        placeholder="Search users..."
-      />
+      <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search users..." />
 
       {query.trim().length === 1 ? <p className="muted-text">Type at least 2 characters.</p> : null}
       {searching ? <p className="muted-text">Searching...</p> : null}
+      {!searching && query.trim().length >= 2 && !results.length ? (
+        <p className="muted-text">No matching users found.</p>
+      ) : null}
 
       <div className="dm-user-results">
         {results.map((result) => (
@@ -97,9 +105,7 @@ function UserSearch({ query, setQuery, results, onAdd, onAccept, onMessage, sear
                   Accept
                 </button>
               ) : null}
-              {result.friendshipStatus === "outgoing_request" ? (
-                <span className="status-chip">Pending</span>
-              ) : null}
+              {result.friendshipStatus === "outgoing_request" ? <span className="status-chip">Pending</span> : null}
             </div>
           </article>
         ))}
@@ -113,7 +119,7 @@ function FriendRequests({ requests, onAccept }) {
 
   return (
     <div className="panel dm-requests-panel">
-      <h3>Friend Requests</h3>
+      <h3>Friend Requests ({requests.length})</h3>
       <div className="dm-user-results">
         {requests.map((request) => (
           <article key={getUserId(request)} className="dm-user-result">
@@ -135,7 +141,10 @@ function Conversation({ participant, messages, myUserId }) {
   return (
     <div className="dm-messages">
       {messages.length === 0 ? (
-        <p className="supporting-copy">No messages yet with {participant?.username}. Say hello.</p>
+        <EmptyState
+          title={`No messages yet with ${participant?.username || "this user"}`}
+          description="The thread is ready. Send the first message to start the conversation."
+        />
       ) : (
         messages.map((message) => {
           const mine = message.senderId?.toString() === myUserId;
@@ -293,6 +302,15 @@ function MessagesPage() {
     }
   }
 
+  function handleDraftKeyDown(event) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      if (!sending && draft.trim()) {
+        handleSend(event);
+      }
+    }
+  }
+
   function handleSelect(userId) {
     setSearchParams({ userId });
     setError("");
@@ -300,7 +318,7 @@ function MessagesPage() {
   }
 
   if (loading) {
-    return <p>Loading messages...</p>;
+    return <LoadingBlock label="Loading your conversations..." />;
   }
 
   return (
@@ -312,8 +330,8 @@ function MessagesPage() {
         </div>
       </header>
 
-      {error ? <p className="error">{error}</p> : null}
-      {notice ? <p className="notice">{notice}</p> : null}
+      <StatusBanner type="error" message={error} />
+      <StatusBanner type="info" message={notice} />
 
       <div className="dm-grid">
         <aside className="dm-sidebar">
@@ -350,8 +368,13 @@ function MessagesPage() {
                   placeholder="Write a message"
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
+                  onKeyDown={handleDraftKeyDown}
                   maxLength={1000}
                 />
+                <div className="dm-compose-meta">
+                  <span className="muted-text">Press Enter to send, Shift + Enter for a new line.</span>
+                  <span className="muted-text">{draft.length}/1000</span>
+                </div>
                 <button className="btn btn-primary" type="submit" disabled={sending || !draft.trim()}>
                   {sending ? "Sending..." : "Send"}
                 </button>
@@ -359,10 +382,10 @@ function MessagesPage() {
             </>
           ) : (
             <div className="dm-empty-state">
-              <h3>No conversation selected</h3>
-              <p className="supporting-copy">
-                Choose a friend from the conversation list, or search for someone and send a friend request first.
-              </p>
+              <EmptyState
+                title="No conversation selected"
+                description="Choose a friend from the conversation list, or search for someone and send a friend request first."
+              />
             </div>
           )}
         </div>

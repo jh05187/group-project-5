@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import CaseCard from "../components/CaseCard";
+import { EmptyState, LoadingBlock, StatusBanner } from "../components/Feedback";
 import { api } from "../lib/api";
 
 function CaseFeedPage() {
   const [cases, setCases] = useState([]);
   const [difficulty, setDifficulty] = useState("");
   const [contentType, setContentType] = useState("");
+  const [query, setQuery] = useState("");
+  const [sortBy, setSortBy] = useState("newest");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -22,8 +25,30 @@ function CaseFeedPage() {
       .finally(() => setLoading(false));
   }, [difficulty, contentType]);
 
-  const availableCases = cases.filter((item) => !item.attempted);
-  const completedCases = cases.filter((item) => item.attempted);
+  const normalizedQuery = query.trim().toLowerCase();
+
+  function sortCases(items) {
+    return [...items].sort((a, b) => {
+      if (sortBy === "title") return a.title.localeCompare(b.title);
+      if (sortBy === "difficulty") {
+        const order = { easy: 0, medium: 1, hard: 2 };
+        return (order[a.difficulty] ?? 99) - (order[b.difficulty] ?? 99);
+      }
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }
+
+  const filteredCases = cases.filter((item) => {
+    if (!normalizedQuery) return true;
+    return (
+      item.title.toLowerCase().includes(normalizedQuery) ||
+      item.content.toLowerCase().includes(normalizedQuery) ||
+      item.contentType.toLowerCase().includes(normalizedQuery)
+    );
+  });
+
+  const availableCases = sortCases(filteredCases.filter((item) => !item.attempted));
+  const completedCases = sortCases(filteredCases.filter((item) => item.attempted));
 
   return (
     <section>
@@ -34,7 +59,12 @@ function CaseFeedPage() {
             New cases stay at the top. Completed ones remain available below so users can review and learn from them again.
           </p>
         </div>
-        <div className="filters">
+        <div className="filters filters-extended">
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by title, content, or type"
+          />
           <select value={contentType} onChange={(e) => setContentType(e.target.value)}>
             <option value="">All Types</option>
             <option value="email">Email</option>
@@ -47,11 +77,34 @@ function CaseFeedPage() {
             <option value="medium">Medium</option>
             <option value="hard">Hard</option>
           </select>
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+            <option value="newest">Newest First</option>
+            <option value="title">Title A-Z</option>
+            <option value="difficulty">Easy to Hard</option>
+          </select>
         </div>
       </div>
 
-      {loading ? <p>Loading cases...</p> : null}
-      {error ? <p className="error">{error}</p> : null}
+      <div className="metrics-grid case-feed-summary">
+        <div className="metric">
+          <span className="metric-label">Showing</span>
+          <strong>{filteredCases.length}</strong>
+          <span className="metric-hint">Cases in the current view</span>
+        </div>
+        <div className="metric">
+          <span className="metric-label">Available</span>
+          <strong>{availableCases.length}</strong>
+          <span className="metric-hint">Not answered yet</span>
+        </div>
+        <div className="metric">
+          <span className="metric-label">Completed</span>
+          <strong>{completedCases.length}</strong>
+          <span className="metric-hint">Ready for review</span>
+        </div>
+      </div>
+
+      {loading ? <LoadingBlock label="Loading the current training bank..." /> : null}
+      <StatusBanner type="error" message={error} />
 
       <section className="case-section">
         <div className="section-head">
@@ -65,7 +118,12 @@ function CaseFeedPage() {
             <CaseCard key={item._id} item={item} />
           ))}
         </div>
-        {!loading && !availableCases.length ? <p className="muted-text">No new cases found for current filters.</p> : null}
+        {!loading && !availableCases.length ? (
+          <EmptyState
+            title="No new cases in this view"
+            description="Try widening your search or clearing one of the filters to reveal more training cases."
+          />
+        ) : null}
       </section>
 
       <section className="case-section">
@@ -80,7 +138,12 @@ function CaseFeedPage() {
             <CaseCard key={item._id} item={item} />
           ))}
         </div>
-        {!loading && !completedCases.length ? <p className="muted-text">You have not completed any cases in this filtered view yet.</p> : null}
+        {!loading && !completedCases.length ? (
+          <EmptyState
+            title="No completed cases yet"
+            description="Finished cases appear here so you can revisit them, compare your choices, and study the explanations again."
+          />
+        ) : null}
       </section>
     </section>
   );
